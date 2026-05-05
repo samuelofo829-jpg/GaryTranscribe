@@ -1,0 +1,4 @@
+streamlit
+openai-whisper
+setuptools-rust
+ffmpeg-python
