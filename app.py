@@ -3,51 +3,50 @@ import whisper
 import tempfile
 import os
 
-st.set_page_config(page_title="GaryTranscribe Pro", page_icon="🎙️")
+st.set_page_config(page_title="GaryTranscribe Stable", page_icon="🎙️")
 
-st.title("🎙️ GaryTranscribe Pro")
-st.markdown("High-accuracy transcription powered by Whisper-Small.")
+st.title("🎙️ GaryTranscribe Stable")
 
-# Load AI Model (Upgraded from 'base' to 'small')
+# Stable Model Choice
 @st.cache_resource
 def load_model():
-    return whisper.load_model("small")
+    return whisper.load_model("base")
 
-model = load_model()
+try:
+    model = load_model()
+except Exception as e:
+    st.error("Model loading failed. Try clicking 'Clear Cache' in the sidebar.")
 
-uploaded_file = st.file_uploader("Choose an audio file", type=["mp3", "wav", "m4a", "ogg"])
+uploaded_file = st.file_uploader("Upload Audio", type=["mp3", "wav", "m4a", "ogg"])
 
 if uploaded_file is not None:
-    # Use a persistent bytes object to prevent player errors
-    audio_bytes = uploaded_file.read()
-    st.audio(audio_bytes, format='audio/mp3')
+    # We use a copy of the bytes to keep the player stable
+    file_details = uploaded_file.getvalue()
+    st.audio(file_details)
     
     if st.button("Start Transcription"):
-        with st.spinner("G is analyzing the audio... this 'Small' model is deeper, so give it a moment."):
-            # Create a temp file correctly
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
-                tmp_file.write(audio_bytes)
-                tmp_path = tmp_file.name
-
+        with st.spinner("Processing..."):
+            # Use a simpler temp file approach
+            tfile = tempfile.NamedTemporaryFile(delete=False) 
+            tfile.write(file_details)
+            
             try:
-                # Transcribe
-                result = model.transcribe(tmp_path)
-                transcript_text = result["text"].strip()
+                # Run transcription
+                result = model.transcribe(tfile.name)
+                text = result["text"].strip()
                 
-                st.subheader("Transcription:")
-                st.success("Complete!")
-                st.write(transcript_text)
+                st.subheader("Result:")
+                st.info(text)
                 
-                # Fixed Download Button: We pass the text directly so no 'File Not Found'
-                st.download_button(
-                    label="Download Transcript (.txt)",
-                    data=transcript_text,
-                    file_name=f"transcript_{uploaded_file.name}.txt",
-                    mime="text/plain"
-                )
+                st.download_button("Download Text", text, file_name="transcript.txt")
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error(f"Transcription Error: {e}")
             finally:
-                # Cleanup temp file
-                if os.path.exists(tmp_path):
-                    os.remove(tmp_path)
+                tfile.close()
+                os.unlink(tfile.name)
+
+# Sidebar helper
+with st.sidebar:
+    if st.button("Clear Cache & Reset"):
+        st.cache_resource.clear()
+        st.rerun()
